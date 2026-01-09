@@ -1,0 +1,9 @@
+﻿services:
+  service:
+    image: ghcr.io/tawmy/media-service:0.0.1
+    container_name: media-service
+    restart: unless-stopped
+    environment:
+      LOGGING__LOGLEVEL__DEFAULT: Information
+      LOGGING__LOGLEVEL__MICROSOFT.ASPNETCORE: Warning
+      LOGGING__LOGLEVEL__MICROSOFT.ENTITYFRAMEWORKCORE: Warning

@@ -1,0 +1,11 @@
+﻿services:
+  service:
+    networks:
+      - reverse-proxy
+    labels:
+      caddy: media-service.tawmy.net
+      caddy.reverse_proxy: "{{upstreams 8080}}"
+
+networks:
+  reverse-proxy:
+    external: true

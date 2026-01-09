@@ -1,0 +1,4 @@
+﻿services:
+  service:
+    labels:
+      caddy: media-service.staging.tawmy.net
