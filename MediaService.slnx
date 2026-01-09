@@ -1,0 +1,4 @@
+<Solution>
+    <Project Path="MediaService.Client/MediaService.Client.csproj"/>
+    <Project Path="MediaService/MediaService.csproj"/>
+</Solution>
