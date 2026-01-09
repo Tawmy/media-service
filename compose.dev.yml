@@ -1,0 +1,16 @@
+﻿services:
+  service:
+    image: ghcr.io/tawmy/media-service:feature-deployment
+    networks:
+      - reverse-proxy
+    labels:
+      caddy: media-service.tawmy.dev
+      caddy.reverse_proxy: "{{upstreams 8080}}"
+
+networks:
+  reverse-proxy:
+    external: true
+
+volumes:
+  api_data:
+    name: netstone-api-db
