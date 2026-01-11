@@ -2,6 +2,7 @@
 @using System.ComponentModel.DataAnnotations
 @using AspNetCoreExtensions
 @using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.Formats.Webp
 @rendermode InteractiveWebAssembly
 @inject IJSRuntime Js
 
@@ -49,6 +50,15 @@
         </RadzenSelectBar>
     }
 
+    <br/>
+
+    <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Quality</RadzenText>
+    <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
+        <RadzenSlider @bind-Value="@_selectedQuality" TValue="string"/>
+        <RadzenTextBox @bind-Value="@_selectedQuality" Immediate="true"
+                       Style="width: 4rem; text-align: center;"></RadzenTextBox>
+    </div>
+
     <RadzenStack AlignItems="AlignItems.Center">
         <RadzenCard class="rz-m-0 rz-m-md-12" Style="width: 100%; max-width: 600px;">
             <RadzenText TextStyle="TextStyle.H4" TagName="TagName.H2">Upload Image</RadzenText>
@@ -83,6 +93,7 @@
 @code {
     MediaType _selectedMediaType = MediaType.Image;
     ImageFormat _selectedImageFormat = ImageFormat.WebP;
+    string _selectedQuality = "75";
 
     string? _fileName;
 
@@ -186,7 +197,7 @@
         switch (_selectedImageFormat)
         {
             case ImageFormat.WebP:
-                await image.SaveAsWebpAsync(stream);
+                await image.SaveAsWebpAsync(stream, new WebpEncoder { Quality = int.Parse(_selectedQuality) });
                 break;
             case ImageFormat.JpegXl:
                 throw new NotImplementedException();
