@@ -1,6 +1,6 @@
 ﻿services:
   service:
-    image: ghcr.io/tawmy/media-service:main
+    image: ghcr.io/tawmy/media-service:feature-faster-build
     networks:
       - reverse-proxy
     labels:
