@@ -1,7 +1,9 @@
 ﻿@page "/"
 @using System.ComponentModel.DataAnnotations
 @using AspNetCoreExtensions
+@using MediaService.Client.Extensions
 @using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.Formats.Jpeg
 @using SixLabors.ImageSharp.Formats.Webp
 @rendermode InteractiveWebAssembly
 @inject IJSRuntime Js
@@ -40,12 +42,13 @@
     @if (_selectedMediaType == MediaType.Image)
     {
         <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Image Format</RadzenText>
-        <RadzenSelectBar TValue="ImageFormat" Size="ButtonSize.Medium" @bind-Value="@_selectedImageFormat"
+        <RadzenSelectBar TValue="ImageFormat" Size="ButtonSize.Medium" @bind-Value="@SelectedImageFormat"
                          Disabled="@UploadDisabled()">
             <Items>
                 <RadzenSelectBarItem Value="ImageFormat.JpegXl" Text="@ImageFormat.JpegXl.GetDisplayName()"
                                      Disabled="true" style="cursor: not-allowed"/>
                 <RadzenSelectBarItem Value="ImageFormat.WebP" Text="@ImageFormat.WebP.GetDisplayName()"/>
+                <RadzenSelectBarItem Value="ImageFormat.Jpeg" Text="@ImageFormat.Jpeg.GetDisplayName()"/>
             </Items>
         </RadzenSelectBar>
     }
@@ -54,7 +57,7 @@
 
     <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Quality</RadzenText>
     <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
-        <RadzenSlider @bind-Value="@_selectedQuality" TValue="string"/>
+        <RadzenSlider @bind-Value="@_selectedQuality" TValue="string" Min="@SelectedImageFormat.GetMinimumQuality()"/>
         <RadzenTextBox @bind-Value="@_selectedQuality" Immediate="true"
                        Style="width: 4rem; text-align: center;"></RadzenTextBox>
     </div>
@@ -92,7 +95,17 @@
 
 @code {
     MediaType _selectedMediaType = MediaType.Image;
-    ImageFormat _selectedImageFormat = ImageFormat.WebP;
+
+    ImageFormat SelectedImageFormat
+    {
+        get;
+        set
+        {
+            SelectedImageFormatChanged(value);
+            field = value;
+        }
+    } = ImageFormat.WebP;
+
     string _selectedQuality = "75";
 
     string? _fileName;
@@ -124,6 +137,16 @@
         InvokeAsync(StateHasChanged);
     }
 
+    void SelectedImageFormatChanged(ImageFormat imageFormat)
+    {
+        var selectedQuality = int.Parse(_selectedQuality);
+        var minimumQuality = imageFormat.GetMinimumQuality();
+        if (selectedQuality < minimumQuality)
+        {
+            _selectedQuality = minimumQuality.ToString();
+        }
+    }
+
     async Task SetStatus(string? status, bool isError = false)
     {
         if (isError)
@@ -147,11 +170,13 @@
         Video
     }
 
-    private enum ImageFormat
+    internal enum ImageFormat
     {
         [Display(Name = "JPEG XL")] JpegXl,
 
-        [Display(Name = "WebP")] WebP
+        [Display(Name = "WebP")] WebP,
+
+        [Display(Name = "JPEG")] Jpeg
     }
 
     #region Image Conversion
@@ -175,7 +200,7 @@
         await Task.Delay(1);
         using var image = Image.Load(imageBytes);
 
-        await SetStatus($"Converting to {_selectedImageFormat.GetDisplayName()}...");
+        await SetStatus($"Converting to {SelectedImageFormat.GetDisplayName()}...");
         await Task.Delay(1);
         using var stream = new MemoryStream();
         await ConvertImageAsync(image, stream);
@@ -194,13 +219,17 @@
 
     private async Task ConvertImageAsync(Image image, MemoryStream stream)
     {
-        switch (_selectedImageFormat)
+        var quality = int.Parse(_selectedQuality);
+        switch (SelectedImageFormat)
         {
-            case ImageFormat.WebP:
-                await image.SaveAsWebpAsync(stream, new WebpEncoder { Quality = int.Parse(_selectedQuality) });
-                break;
             case ImageFormat.JpegXl:
                 throw new NotImplementedException();
+            case ImageFormat.WebP:
+                await image.SaveAsWebpAsync(stream, new WebpEncoder { Quality = quality });
+                break;
+            case ImageFormat.Jpeg:
+                await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = quality });
+                break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
@@ -211,7 +240,7 @@
     private async Task DownloadImageAsync(MemoryStream stream)
     {
         using var streamRef = new DotNetStreamReference(stream);
-        var downloadFileName = Path.ChangeExtension(_fileName, ".webp");
+        var downloadFileName = Path.ChangeExtension(_fileName, SelectedImageFormat.GetFileExtension());
         await Js.InvokeVoidAsync("downloadFileFromStream", downloadFileName, streamRef);
     }
 
