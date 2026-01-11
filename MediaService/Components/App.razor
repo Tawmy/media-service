@@ -10,12 +10,14 @@
     <link rel="stylesheet" href="@Assets["MediaService.styles.css"]"/>
     <ImportMap/>
     <HeadOutlet/>
+    <RadzenTheme Theme="standard" Wcag="true"/>
 </head>
 
 <body>
 <Routes/>
 <ReconnectModal/>
 <script src="@Assets["_framework/blazor.web.js"]"></script>
+<script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Colors).Assembly.GetName().Version)"></script>
 </body>
 
 </html>

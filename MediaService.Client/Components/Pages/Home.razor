@@ -1,0 +1,249 @@
+﻿@page "/"
+@using System.ComponentModel.DataAnnotations
+@using AspNetCoreExtensions
+@using MediaService.Client.Extensions
+@using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.Formats.Jpeg
+@using SixLabors.ImageSharp.Formats.Webp
+@rendermode InteractiveWebAssembly
+@inject IJSRuntime Js
+
+<PageTitle>Media Service</PageTitle>
+<HeadContent>
+    <script>
+        window.downloadFileFromStream = async (fileName, contentStreamReference) => {
+            const arrayBuffer = await contentStreamReference.arrayBuffer();
+            const blob = new Blob([arrayBuffer]);
+            const url = URL.createObjectURL(blob);
+            const anchorElement = document.createElement('a');
+            anchorElement.href = url;
+            anchorElement.download = fileName ?? '';
+            anchorElement.click();
+            anchorElement.remove();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</HeadContent>
+
+
+<div class="container">
+    <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Media Type</RadzenText>
+    <RadzenSelectBar TValue="MediaType" Size="ButtonSize.Medium" @bind-Value="@_selectedMediaType"
+                     Disabled="@UploadDisabled()">
+        <Items>
+            <RadzenSelectBarItem Value="MediaType.Image" Text="@nameof(MediaType.Image)"/>
+            <RadzenSelectBarItem Value="MediaType.Video" Text="@nameof(MediaType.Video)"
+                                 Disabled="true" style="cursor: not-allowed"/>
+        </Items>
+    </RadzenSelectBar>
+
+    <br/>
+
+    @if (_selectedMediaType == MediaType.Image)
+    {
+        <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Image Format</RadzenText>
+        <RadzenSelectBar TValue="ImageFormat" Size="ButtonSize.Medium" @bind-Value="@SelectedImageFormat"
+                         Disabled="@UploadDisabled()">
+            <Items>
+                <RadzenSelectBarItem Value="ImageFormat.JpegXl" Text="@ImageFormat.JpegXl.GetDisplayName()"
+                                     Disabled="true" style="cursor: not-allowed"/>
+                <RadzenSelectBarItem Value="ImageFormat.WebP" Text="@ImageFormat.WebP.GetDisplayName()"/>
+                <RadzenSelectBarItem Value="ImageFormat.Jpeg" Text="@ImageFormat.Jpeg.GetDisplayName()"/>
+            </Items>
+        </RadzenSelectBar>
+    }
+
+    <br/>
+
+    <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Quality</RadzenText>
+    <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
+        <RadzenSlider @bind-Value="@_selectedQuality" TValue="string" Min="@SelectedImageFormat.GetMinimumQuality()"/>
+        <RadzenTextBox @bind-Value="@_selectedQuality" Immediate="true"
+                       Style="width: 4rem; text-align: center;"></RadzenTextBox>
+    </div>
+
+    <RadzenStack AlignItems="AlignItems.Center">
+        <RadzenCard class="rz-m-0 rz-m-md-12" Style="width: 100%; max-width: 600px;">
+            <RadzenText TextStyle="TextStyle.H4" TagName="TagName.H2">Upload Image</RadzenText>
+            <RadzenFileInput @bind-FileName="@_fileName"
+
+                             TValue="string"
+                             Style="width: 100%"
+                             Change=@(args => OnChangeAsync(args, "FileInput"))
+                             Error=@(args => OnError(args, "FileInput"))
+                             InputAttributes="@(new Dictionary<string, object> { { "aria-label", "select file" } })"
+                             Disabled="@UploadDisabled()"
+                             ref="fileInput"/>
+        </RadzenCard>
+    </RadzenStack>
+
+</div>
+
+<div class="alert">
+    <RadzenAlert TextStyle="TextStyle.H4"
+                 TagName="TagName.H2"
+                 Visible="@(_status is not null || _error is not null)"
+                 AllowClose="@(_error is not null)"
+                 AlertStyle="@(_error is not null ? AlertStyle.Danger : AlertStyle.Primary)"
+                 Close="@(() =>
+                        {
+                            _error = null;
+                            _status = null;
+                        })"
+    >@(_error ?? _status)</RadzenAlert>
+</div>
+
+@code {
+    MediaType _selectedMediaType = MediaType.Image;
+
+    ImageFormat SelectedImageFormat
+    {
+        get;
+        set
+        {
+            SelectedImageFormatChanged(value);
+            field = value;
+        }
+    } = ImageFormat.WebP;
+
+    string _selectedQuality = "75";
+
+    string? _fileName;
+
+    string? _status;
+    string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+
+    bool UploadDisabled()
+    {
+        return !RendererInfo.IsInteractive;
+    }
+
+    async Task OnChangeAsync(string? value, string name)
+    {
+        if (value is not null)
+        {
+            await ConvertAndDownloadImageAsync(value);
+        }
+    }
+
+    void OnError(UploadErrorEventArgs args, string name)
+    {
+        _error = $"{args.Message}";
+        InvokeAsync(StateHasChanged);
+    }
+
+    void SelectedImageFormatChanged(ImageFormat imageFormat)
+    {
+        var selectedQuality = int.Parse(_selectedQuality);
+        var minimumQuality = imageFormat.GetMinimumQuality();
+        if (selectedQuality < minimumQuality)
+        {
+            _selectedQuality = minimumQuality.ToString();
+        }
+    }
+
+    async Task SetStatus(string? status, bool isError = false)
+    {
+        if (isError)
+        {
+            _status = null;
+            _error = status;
+        }
+        else
+        {
+            _error = null;
+            _status = status;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+    private enum MediaType
+    {
+        Image,
+        Video
+    }
+
+    internal enum ImageFormat
+    {
+        [Display(Name = "JPEG XL")] JpegXl,
+
+        [Display(Name = "WebP")] WebP,
+
+        [Display(Name = "JPEG")] Jpeg
+    }
+
+    #region Image Conversion
+
+    private async Task ConvertAndDownloadImageAsync(string value)
+    {
+        await SetStatus("Reading file...");
+        await Task.Delay(1);
+        byte[] imageBytes;
+        try
+        {
+            imageBytes = ConvertBase64StringToByteArray(value);
+        }
+        catch (Exception e)
+        {
+            await SetStatus(e.Message, true);
+            return;
+        }
+
+        await SetStatus("Loading image...");
+        await Task.Delay(1);
+        using var image = Image.Load(imageBytes);
+
+        await SetStatus($"Converting to {SelectedImageFormat.GetDisplayName()}...");
+        await Task.Delay(1);
+        using var stream = new MemoryStream();
+        await ConvertImageAsync(image, stream);
+
+        await SetStatus(null);
+        await Task.Delay(1);
+        await DownloadImageAsync(stream);
+    }
+
+    private byte[] ConvertBase64StringToByteArray(string value)
+    {
+        var base64String = value.Split(",")[1]; // Remove "data:image/format;base64," prefix
+        var imageBytes = Convert.FromBase64String(base64String);
+        return imageBytes;
+    }
+
+    private async Task ConvertImageAsync(Image image, MemoryStream stream)
+    {
+        var quality = int.Parse(_selectedQuality);
+        switch (SelectedImageFormat)
+        {
+            case ImageFormat.JpegXl:
+                throw new NotImplementedException();
+            case ImageFormat.WebP:
+                await image.SaveAsWebpAsync(stream, new WebpEncoder { Quality = quality });
+                break;
+            case ImageFormat.Jpeg:
+                await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = quality });
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+
+        stream.Seek(0, SeekOrigin.Begin);
+    }
+
+    private async Task DownloadImageAsync(MemoryStream stream)
+    {
+        using var streamRef = new DotNetStreamReference(stream);
+        var downloadFileName = Path.ChangeExtension(_fileName, SelectedImageFormat.GetFileExtension());
+        await Js.InvokeVoidAsync("downloadFileFromStream", downloadFileName, streamRef);
+    }
+
+    #endregion
+
+}

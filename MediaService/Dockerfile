@@ -4,6 +4,11 @@ WORKDIR /app
 EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+RUN dotnet workload install wasm-tools
+RUN apt update
+RUN apt install -y python3.12
+RUN ln -s /usr/bin/python3.12 /usr/bin/python
+
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["MediaService/MediaService.csproj", "MediaService/"]
