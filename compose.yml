@@ -4,6 +4,7 @@
     container_name: media-service
     restart: unless-stopped
     environment:
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: true
       LOGGING__LOGLEVEL__DEFAULT: Information
       LOGGING__LOGLEVEL__MICROSOFT.ASPNETCORE: Warning
       LOGGING__LOGLEVEL__MICROSOFT.ENTITYFRAMEWORKCORE: Warning
