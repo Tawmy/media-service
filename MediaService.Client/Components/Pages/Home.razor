@@ -57,8 +57,9 @@
 
     <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H1">Quality</RadzenText>
     <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
-        <RadzenSlider @bind-Value="@_selectedQuality" TValue="string" Min="@SelectedImageFormat.GetMinimumQuality()"/>
-        <RadzenTextBox @bind-Value="@_selectedQuality" Immediate="true"
+        <RadzenSlider @bind-Value="@_selectedQuality" TValue="string" Min="@SelectedImageFormat.GetMinimumQuality()"
+                      Disabled="@UploadDisabled()"/>
+        <RadzenTextBox @bind-Value="@_selectedQuality" Immediate="true" Disabled="@UploadDisabled()"
                        Style="width: 4rem; text-align: center;"></RadzenTextBox>
     </div>
 
@@ -112,6 +113,7 @@
 
     string? _status;
     string? _error;
+    bool _processing;
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,7 +122,7 @@
 
     bool UploadDisabled()
     {
-        return !RendererInfo.IsInteractive;
+        return !RendererInfo.IsInteractive || _processing;
     }
 
     async Task OnChangeAsync(string? value, string name)
@@ -183,8 +185,10 @@
 
     private async Task ConvertAndDownloadImageAsync(string value)
     {
+        _processing = true;
         await SetStatus("Reading file...");
         await Task.Delay(1);
+
         byte[] imageBytes;
         try
         {
@@ -205,6 +209,7 @@
         using var stream = new MemoryStream();
         await ConvertImageAsync(image, stream);
 
+        _processing = false;
         await SetStatus(null);
         await Task.Delay(1);
         await DownloadImageAsync(stream);
